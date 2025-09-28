@@ -94,7 +94,7 @@ docker-compose up --build
 ## Default Admin Account
 
 - **Email:** `admin@wfh.com`
-- **Password:** `admin123`  
+- **Password:** `password`  
 
 > Can log in to access admin dashboards and employee management.
 
