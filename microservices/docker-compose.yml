@@ -1,0 +1,127 @@
+services:
+  # Databases
+  auth-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+      - ./init-admin.sql:/docker-entrypoint-initdb.d/01-init-admin.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  employee-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: employee_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5434:5432"
+    volumes:
+      - employee_db_data:/var/lib/postgresql/data
+      - ./seed-admin.sql:/docker-entrypoint-initdb.d/seed-admin.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  attendance-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: attendance_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5435:5432"
+    volumes:
+      - attendance_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Services
+  auth-service:
+    build: 
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=auth-db
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - DB_DATABASE=auth_db
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  employee-service:
+    build: 
+      context: ./employee-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=employee-db
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - DB_DATABASE=employee_db
+    depends_on:
+      - employee-db
+    restart: unless-stopped
+
+  attendance-service:
+    build: 
+      context: ./attendance-service
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=attendance-db
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - DB_DATABASE=attendance_db
+    depends_on:
+      - attendance-db
+    restart: unless-stopped
+
+  api-gateway:
+    build: 
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - EMPLOYEE_SERVICE_URL=http://employee-service:3002
+      - ATTENDANCE_SERVICE_URL=http://attendance-service:3003
+    depends_on:
+      - auth-service
+      - employee-service
+      - attendance-service
+    restart: unless-stopped
+
+volumes:
+  auth_db_data:
+  employee_db_data:
+  attendance_db_data:
